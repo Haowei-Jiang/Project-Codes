@@ -1,0 +1,507 @@
+%Digital Camera Basic Model Simulation
+%Dec 2015 | EE516LEC - Introduction to DSP | University at Buffalo
+
+%Part1: De-noise (based on MATLAB function)
+
+clear;
+clc;
+
+%original pic
+[I,map]=imread('The_Walls_Group_2014.jpg');                  %add pic u want!
+I=rgb2gray(I);                                               %change to gray level image
+[width,height]=size(I);
+
+%adding noise
+J1=imnoise(I,'gaussian');                                    %additive noise
+J2=imnoise(I,'salt & pepper');                               %additive noise
+
+
+%%%%%%%%%%%%% gaussian noise-using mean filter %%%%%%%%%%%%%
+
+%1. code(we have to code instead of using function)
+%%%%%%%%%%%%% template matrix %%%%%%%%%%%%%
+t1_3x3=ones(3);n1=3;
+t1_5x5=ones(5);n2=5;
+t1_7x7=ones(7);n3=7;
+J1_d=double(J1);                                             %transform uint8 into double in order to caculate the mean
+
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J1_dnc=J1_d;
+for i=1:height-n1+1
+    for j=1:width-n1+1
+        p=J1_d(i:i+(n1-1),j:j+(n1-1)).*t1_3x3;               %multiply the element in J1_d with template
+        s=sum(sum(p));                                       %get sum to calculate mean value
+        J1_dnc(i+(n1-1)/2,j+(n1-1)/2)=s/(n1*n1);             %replace the middle value of pic with the mean value
+    end
+end
+J1_dnc_3x3=uint8(J1_dnc);
+%%%%%%%%%%%%% 5 * 5 %%%%%%%%%%%%%
+J1_dnc=J1_d;
+for i=1:height-n2+1
+    for j=1:width-n2+1
+        p=J1_d(i:i+(n2-1),j:j+(n2-1)).*t1_5x5;               %multiply the element in J1_d with template
+        s=sum(sum(p));                                       %get mean value
+        J1_dnc(i+(n2-1)/2,j+(n2-1)/2)=s/(n2*n2);             %replace the middle value of pic with the mean value
+    end
+end
+J1_dnc_5x5=uint8(J1_dnc);
+%%%%%%%%%%%%% 7 * 7 %%%%%%%%%%%%%
+J1_dnc=J1_d;
+for i=1:height-n3+1
+    for j=1:width-n3+1
+        p=J1_d(i:i+(n3-1),j:j+(n3-1)).*t1_7x7;               %multiply the element in J1_d with template
+        s=sum(sum(p));                                       %get mean value
+        J1_dnc(i+(n3-1)/2,j+(n3-1)/2)=s/(n3*n3);             %replace the middle value of pic with the mean value
+    end
+end
+J1_dnc_7x7=uint8(J1_dnc);
+
+%2. function call
+J1_dn_3x3=filter2(fspecial('average',3),I)/255;              %normalization is to keep the image pixel values btw 0-255
+J1_dn_5x5=filter2(fspecial('average',5),I)/255; 
+J1_dn_7x7=filter2(fspecial('average',7),I)/255; 
+
+%3.Optimization-eliminate boundary effect--Extend border value outisde the boundary
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J1_new_3x3=ones(width+2);
+%%%%%%%%%%%%% 5 x 5 %%%%%%%%%%%%%
+J1_new_5x5=ones(width+4);
+%%%%%%%%%%%%% 7 x 7 %%%%%%%%%%%%%
+J1_new_7x7=ones(width+6);
+
+%1. Extend 4 vertexs
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J1_new_3x3(1,1)=J1_d(1,1);
+J1_new_3x3(1,end)=J1_d(1,end);
+J1_new_3x3(end,1)=J1_d(end,1);
+J1_new_3x3(end,end)=J1_d(end,end);
+%%%%%%%%%%%%% 5 x 5 %%%%%%%%%%%%%--extend 3*3 by 1
+J1_new_5x5(1,1)=J1_new_3x3(1,1);
+J1_new_5x5(1,end)=J1_new_3x3(1,end);
+J1_new_5x5(end,1)=J1_new_3x3(end,1);
+J1_new_5x5(end,end)=J1_new_3x3(end,end);
+%%%%%%%%%%%%% 7 x 7 %%%%%%%%%%%%%--extend 5*5 by 1
+J1_new_7x7(1,1)=J1_new_5x5(1,1);
+J1_new_7x7(1,end)=J1_new_5x5(1,end);
+J1_new_7x7(end,1)=J1_new_5x5(end,1);
+J1_new_7x7(end,end)=J1_new_5x5(end,end);
+
+%2. Extend 4 edges
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J1_new_3x3(1,2:end-1)=J1_d(1,:);
+J1_new_3x3(end,2:end-1)=J1_d(end,:);
+J1_new_3x3(2:end-1,1)=J1_d(:,1);
+J1_new_3x3(2:end-1,end)=J1_d(:,end);
+%%%%%%%%%%%%% 5 x 5 %%%%%%%%%%%%%--extend 3*3 by 1
+J1_new_5x5(1,2:end-1)=J1_new_3x3(1,:);
+J1_new_5x5(end,2:end-1)=J1_new_3x3(end,:);
+J1_new_5x5(2:end-1,1)=J1_new_3x3(:,1);
+J1_new_5x5(2:end-1,end)=J1_new_3x3(:,end);
+%%%%%%%%%%%%% 7 x 7 %%%%%%%%%%%%%--extend 5*5 by 1
+J1_new_7x7(1,2:end-1)=J1_new_5x5(1,:);
+J1_new_7x7(end,2:end-1)=J1_new_5x5(end,:);
+J1_new_7x7(2:end-1,1)=J1_new_5x5(:,1);
+J1_new_7x7(2:end-1,end)=J1_new_5x5(:,end);
+
+%3. copy the rest
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J1_new_3x3(2:end-1,2:end-1)=J1_d;
+[width1,height1]=size(J1_new_3x3);
+%%%%%%%%%%%%% 5 x 5 %%%%%%%%%%%%%
+J1_new_5x5(2:end-1,2:end-1)=J1_new_3x3;
+[width2,height2]=size(J1_new_5x5);
+%%%%%%%%%%%%% 7 x 7 %%%%%%%%%%%%%
+J1_new_7x7(2:end-1,2:end-1)=J1_new_5x5;
+[width3,height3]=size(J1_new_7x7);
+
+
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J1_dnc_opt=J1_new_3x3;
+for i=1:height1-n1+1
+    for j=1:width1-n1+1
+        p=J1_new_3x3(i:i+(n1-1),j:j+(n1-1)).*t1_3x3;              %multiply the element in J1_d with template
+        s=sum(sum(p));                                            %get sum to calculate mean value
+        J1_dnc_opt(i+(n1-1)/2,j+(n1-1)/2)=s/(n1*n1);              %replace the middle value of pic with the mean value
+    end
+end
+J1_dnc_opt_3x3=uint8(J1_dnc_opt);
+
+%%%%%%%%%%%%% 5 x 5 %%%%%%%%%%%%%
+J1_dnc_opt=J1_new_5x5;
+for i=1:height2-n2+1
+    for j=1:width2-n2+1
+        p=J1_new_5x5(i:i+(n2-1),j:j+(n2-1)).*t1_5x5;              %multiply the element in J1_d with template
+        s=sum(sum(p));                                            %get sum to calculate mean value
+        J1_dnc_opt(i+(n2-1)/2,j+(n2-1)/2)=s/(n2*n2);              %replace the middle value of pic with the mean value
+    end
+end
+J1_dnc_opt_5x5=uint8(J1_dnc_opt);
+
+%%%%%%%%%%%%% 7 x 7 %%%%%%%%%%%%%
+J1_dnc_opt=J1_new_7x7;
+for i=1:height3-n3+1
+    for j=1:width3-n3+1
+        p=J1_new_7x7(i:i+(n3-1),j:j+(n3-1)).*t1_7x7;              %multiply the element in J1_d with template
+        s=sum(sum(p));                                            %get sum to calculate mean value
+        J1_dnc_opt(i+(n3-1)/2,j+(n3-1)/2)=s/(n3*n3);              %replace the middle value of pic with the mean value
+    end
+end
+J1_dnc_opt_7x7=uint8(J1_dnc_opt);
+
+%3. comparison
+figure (1)
+subplot 241
+imshow(J1);
+title('Original with gaussian noise');
+axis square
+subplot 242
+imshow(J1_dn_3x3);
+title('3x3 mean filter de-noise');
+axis square
+subplot 243
+imshow(J1_dn_5x5);
+title('5x5 mean filter de-noise');
+axis square
+subplot 244
+imshow(J1_dn_7x7);
+title('7x7 mean filter de-nosie');
+axis square
+subplot 246
+imshow(J1_dnc_3x3);
+title('3x3 mean filter de-noise in coding');
+axis square
+subplot 247
+imshow(J1_dnc_5x5);
+title('5x5 mean filter de-noise in coding');
+axis square
+subplot 248
+imshow(J1_dnc_7x7);
+title('7x7 mean filter de-noise in coding');
+axis square
+
+figure (2)
+subplot 231
+imshow(J1_dnc_3x3);
+title('3x3 mean filter de-noise in coding');
+axis square
+subplot 234
+imshow(J1_dnc_opt_3x3(2:end-1,2:end-1));
+title('3x3 mean filter optimization');
+axis square
+subplot 232
+imshow(J1_dnc_5x5);
+title('5x5 mean filter de-noise in coding');
+axis square
+subplot 235
+imshow(J1_dnc_opt_5x5(3:end-2,3:end-2));
+title('5x5 mean filter optimization');
+axis square
+subplot 233
+imshow(J1_dnc_7x7);
+title('7x7 mean filter de-noise in coding');
+axis square
+subplot 236
+imshow(J1_dnc_opt_7x7(4:end-3,4:end-3));
+title('7x7 mean filter optimization');
+axis square
+
+%4. comparison
+figure (1)
+subplot 241
+imshow(J1);
+title('Original with gaussian noise');
+axis square
+subplot 242
+imshow(J1_dn_3x3);
+title('3x3 mean filter de-noise');
+axis square
+subplot 243
+imshow(J1_dn_5x5);
+title('5x5 mean filter de-noise');
+axis square
+subplot 244
+imshow(J1_dn_7x7);
+title('7x7 mean filter de-noise');
+axis square
+subplot 246
+imshow(J1_dnc_3x3);
+title('3x3 mean filter de-noise in coding');
+axis square
+subplot 247
+imshow(J1_dnc_5x5);
+title('5x5 mean filter de-noise in coding');
+axis square
+subplot 248
+imshow(J1_dnc_7x7);
+title('7x7 mean filter de-noise in coding');
+axis square
+
+%%%%%%%%%%%%% salt & pepper noise-using median filter %%%%%%%%%%%%%
+
+%1. code(we have to code instead of using function)
+%J2_d=double(J2); %%transform uint8 into double in order to caculate the mean
+
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J2_dnc=J2;
+for i=1:height-n1+1
+    for j=1:width-n1+1
+        p=J2(i:i+(n1-1),j:j+(n1-1));                             %extract the the value in template size
+        row1=p(1,:);                                             %get the each row of matrix p;
+        row2=p(2,:); 
+        row3=p(3,:); 
+        row=[row1,row2,row3];                                    %combine them into one row;
+        mv=median(row);                                          %get the median value
+        J2_dnc(i+(n1-1)/2,j+(n1-1)/2)=mv;                        %replace the middle value of pic with the median value
+    end
+end
+J2_dnc_3x3=uint8(J2_dnc);
+%%%%%%%%%%%%% 5 x 5 %%%%%%%%%%%%%
+J2_dnc=J2;
+for i=1:height-n2+1
+    for j=1:width-n2+1
+        p=J2(i:i+(n2-1),j:j+(n2-1));                            %extract the the value in template size
+        row1=p(1,:);                                            %get the each row of matrix p;
+        row2=p(2,:); 
+        row3=p(3,:); 
+        row4=p(4,:);
+        row5=p(5,:);
+        row=[row1,row2,row3,row4,row5];                         %combine them into one row;
+        mv=median(row);                                         %get the median value
+        J2_dnc(i+(n2-1)/2,j+(n2-1)/2)=mv;                       %replace the middle value of pic with the median value
+    end
+end
+J2_dnc_5x5=uint8(J2_dnc);
+%%%%%%%%%%%%% 7 x 7 %%%%%%%%%%%%%
+J2_dnc=J2;
+for i=1:height-n3+1
+    for j=1:width-n3+1
+        p=J2(i:i+(n3-1),j:j+(n3-1));                            %extract the the value in template size
+        row1=p(1,:);                                            %get the each row of matrix p;
+        row2=p(2,:); 
+        row3=p(3,:);
+        row4=p(4,:);
+        row5=p(5,:);
+        row6=p(6,:);
+        row7=p(7,:);
+        row=[row1,row2,row3,row4,row5,row6,row7];               %combine them into one row;
+        mv=median(row);                                         %get the median value
+        J2_dnc(i+(n3-1)/2,j+(n3-1)/2)=mv;                       %replace the middle value of pic with the median value
+    end
+end
+J2_dnc_7x7=uint8(J2_dnc);
+
+%2. function call
+J2_dn_3x3=medfilt2(J2,[3 3]); 
+J2_dn_5x5=medfilt2(J2,[5 5]);  
+J2_dn_7x7=medfilt2(J2,[7 7]);
+
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J2_dnc=J2;
+for i=1:height-n1+1
+    for j=1:width-n1+1
+        p=J2(i:i+(n1-1),j:j+(n1-1));                            %extract the the value in template size
+        row1=p(1,:);                                            %get the each row of matrix p;
+        row2=p(2,:); 
+        row3=p(3,:); 
+        row=[row1,row2,row3];                                   %combine them into one row;
+        mv=median(row);                                         %get the median value
+        J2_dnc(i+(n1-1)/2,j+(n1-1)/2)=mv;                       %replace the middle value of pic with the median value
+    end
+end
+J2_dnc_3x3=uint8(J2_dnc);
+%%%%%%%%%%%%% 5 x 5 %%%%%%%%%%%%%
+J2_dnc=J2;
+for i=1:height-n2+1
+    for j=1:width-n2+1
+        p=J2(i:i+(n2-1),j:j+(n2-1));                            %extract the the value in template size
+        row1=p(1,:);                                            %get the each row of matrix p;
+        row2=p(2,:); 
+        row3=p(3,:); 
+        row4=p(4,:);
+        row5=p(5,:);
+        row=[row1,row2,row3,row4,row5];                         %combine them into one row;
+        mv=median(row);                                         %get the median value
+        J2_dnc(i+(n2-1)/2,j+(n2-1)/2)=mv;                       %replace the middle value of pic with the median value
+    end
+end
+J2_dnc_5x5=uint8(J2_dnc);
+%%%%%%%%%%%%% 7 x 7 %%%%%%%%%%%%%
+J2_dnc=J2;
+for i=1:height-n3+1
+    for j=1:width-n3+1
+        p=J2(i:i+(n3-1),j:j+(n3-1));                            %extract the the value in template size
+        row1=p(1,:);                                            %get the each row of matrix p;
+        row2=p(2,:); 
+        row3=p(3,:);
+        row4=p(4,:);
+        row5=p(5,:);
+        row6=p(6,:);
+        row7=p(7,:);
+        row=[row1,row2,row3,row4,row5,row6,row7];               %combine them into one row;
+        mv=median(row);                                         %get the median value
+        J2_dnc(i+(n3-1)/2,j+(n3-1)/2)=mv;                       %replace the middle value of pic with the median value
+    end
+end
+J2_dnc_7x7=uint8(J2_dnc);
+
+%2. function call
+J2_dn_3x3=medfilt2(J2,[3 3]); 
+J2_dn_5x5=medfilt2(J2,[5 5]);  
+J2_dn_7x7=medfilt2(J2,[7 7]);
+
+%3.Optimization-eliminate boundary effect--Extend border value outisde the boundary
+J2_dnc=J2;
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J2_new_3x3=ones(width+2);
+%%%%%%%%%%%%% 5 x 5 %%%%%%%%%%%%%
+J2_new_5x5=ones(width+4);
+%%%%%%%%%%%%% 7 x 7 %%%%%%%%%%%%%
+J2_new_7x7=ones(width+6);
+
+%1. Extend 4 vertexs
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J2_new_3x3(1,1)=J2_dnc(1,1);
+J2_new_3x3(1,end)=J2_dnc(1,end);
+J2_new_3x3(end,1)=J2_dnc(end,1);
+J2_new_3x3(end,end)=J2_dnc(end,end);
+%%%%%%%%%%%%% 5 x 5 %%%%%%%%%%%%%--extend 3*3 by 1
+J2_new_5x5(1,1)=J2_new_3x3(1,1);
+J2_new_5x5(1,end)=J2_new_3x3(1,end);
+J2_new_5x5(end,1)=J2_new_3x3(end,1);
+J2_new_5x5(end,end)=J2_new_3x3(end,end);
+%%%%%%%%%%%%% 7 x 7 %%%%%%%%%%%%%--extend 5*5 by 1
+J2_new_7x7(1,1)=J2_new_5x5(1,1);
+J2_new_7x7(1,end)=J2_new_5x5(1,end);
+J2_new_7x7(end,1)=J2_new_5x5(end,1);
+J2_new_7x7(end,end)=J2_new_5x5(end,end);
+
+%2. Extend 4 edges
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J2_new_3x3(1,2:end-1)=J2_dnc(1,:);
+J2_new_3x3(end,2:end-1)=J2_dnc(end,:);
+J2_new_3x3(2:end-1,1)=J2_dnc(:,1);
+J2_new_3x3(2:end-1,end)=J2_dnc(:,end);
+%%%%%%%%%%%%% 5 x 5 %%%%%%%%%%%%%--extend 3*3 by 1
+J2_new_5x5(1,2:end-1)=J2_new_3x3(1,:);
+J2_new_5x5(end,2:end-1)=J2_new_3x3(end,:);
+J2_new_5x5(2:end-1,1)=J2_new_3x3(:,1);
+J2_new_5x5(2:end-1,end)=J2_new_3x3(:,end);
+%%%%%%%%%%%%% 7 x 7 %%%%%%%%%%%%%--extend 5*5 by 1
+J2_new_7x7(1,2:end-1)=J2_new_5x5(1,:);
+J2_new_7x7(end,2:end-1)=J2_new_5x5(end,:);
+J2_new_7x7(2:end-1,1)=J2_new_5x5(:,1);
+J2_new_7x7(2:end-1,end)=J2_new_5x5(:,end);
+
+%3. copy the rest
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J2_new_3x3(2:end-1,2:end-1)=J2_dnc;
+[width1,height1]=size(J2_new_3x3);
+%%%%%%%%%%%%% 5 x 5 %%%%%%%%%%%%%
+J2_new_5x5(2:end-1,2:end-1)=J2_new_3x3;
+[width2,height2]=size(J2_new_5x5);
+%%%%%%%%%%%%% 7 x 7 %%%%%%%%%%%%%
+J2_new_7x7(2:end-1,2:end-1)=J2_new_5x5;
+[width3,height3]=size(J2_new_7x7);
+
+%%%%%%%%%%%%% 3 x 3 %%%%%%%%%%%%%
+J2_dnc=J2_new_3x3;
+for i=1:height1-n1+1
+    for j=1:width1-n1+1
+        p=J2_new_3x3(i:i+(n1-1),j:j+(n1-1));                      %extract the the value in template size
+        row1=p(1,:);                                              %get the each row of matrix p;
+        row2=p(2,:); 
+        row3=p(3,:); 
+        row=[row1,row2,row3];                                     %combine them into one row;
+        mv=median(row);                                           %get the median value
+        J2_dnc(i+(n1-1)/2,j+(n1-1)/2)=mv;                         %replace the middle value of pic with the median value
+    end
+end
+J2_dnc_opt_3x3=uint8(J2_dnc);
+
+%%%%%%%%%%%%% 5 x 5 %%%%%%%%%%%%%
+J2_dnc=J2_new_5x5;
+for i=1:height2-n2+1
+    for j=1:width2-n2+1
+        p=J2_new_5x5(i:i+(n2-1),j:j+(n2-1));                      %extract the the value in template size
+        row1=p(1,:);                                              %get the each row of matrix p;
+        row2=p(2,:); 
+        row3=p(3,:); 
+        row=[row1,row2,row3];                                     %combine them into one row;
+        mv=median(row);                                           %get the median value
+        J2_dnc(i+(n2-1)/2,j+(n2-1)/2)=mv;                         %replace the middle value of pic with the median value
+    end
+end
+J2_dnc_opt_5x5=uint8(J2_dnc);
+
+%%%%%%%%%%%%% 7 x 7 %%%%%%%%%%%%%
+J2_dnc=J2_new_7x7;
+for i=1:height3-n3+1
+    for j=1:width3-n3+1
+        p=J2_new_7x7(i:i+(n3-1),j:j+(n3-1));                      %extract the the value in template size
+        row1=p(1,:);                                              %get the each row of matrix p;
+        row2=p(2,:); 
+        row3=p(3,:); 
+        row=[row1,row2,row3];                                     %combine them into one row;
+        mv=median(row);                                           %get the median value
+        J2_dnc(i+(n3-1)/2,j+(n3-1)/2)=mv;                         %replace the middle value of pic with the median value
+    end
+end
+J2_dnc_opt_7x7=uint8(J2_dnc);
+
+
+%4. comparison
+figure (3)
+subplot 241
+imshow(J2);
+title('Original with salt & peppe noise');
+axis square
+subplot 242
+imshow(J2_dn_3x3);
+title('3x3 median filter de-noise');
+axis square
+subplot 243
+imshow(J2_dn_5x5);
+title('5x5 median filter de-noise');
+axis square
+subplot 244
+imshow(J2_dn_7x7);
+title('7x7 median filter de-noise');
+axis square
+subplot 246
+imshow(J2_dnc_3x3);
+title('3x3 median filter de-noise in coding');
+axis square
+subplot 247
+imshow(J2_dnc_5x5);
+title('5x5 median filter de-noise in coding');
+axis square
+subplot 248
+imshow(J2_dnc_7x7);
+title('7x7 median filter de-noise in coding');
+axis square
+
+figure (4)
+subplot 231
+imshow(J2_dnc_3x3);
+title('3x3 median filter de-noise in coding');
+axis square
+subplot 234
+imshow(J2_dnc_opt_3x3(2:end-1,2:end-1));
+title('3x3 median filter optimization');
+axis square
+subplot 232
+imshow(J2_dnc_5x5);
+title('5x5 median filter de-noise in coding');
+axis square
+subplot 235
+imshow(J2_dnc_opt_5x5(3:end-2,3:end-2));
+title('5x5 median filter optimization');
+axis square
+subplot 233
+imshow(J2_dnc_7x7);
+title('7x7 median filter de-noise in coding');
+axis square
+subplot 236
+imshow(J2_dnc_opt_7x7(4:end-3,4:end-3));
+title('7x7 median filter optimization');
+axis square
