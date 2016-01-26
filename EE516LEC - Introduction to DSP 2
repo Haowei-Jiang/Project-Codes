@@ -1,0 +1,154 @@
+%Digital Camera Basic Model Simulation
+%Dec 2015 | EE516LEC - Introduction to DSP | University at Buffalo
+
+%part2: contrast enhanced
+
+clear;
+clc;
+
+[L,map]=imread('The_Walls_Group_2014.jpg');          %add pic u want!
+[width,height]=size(L);
+L_hsv=rgb2hsv(L);
+
+%get RGB component
+L_R=L(:,:,1);
+L_G=L(:,:,2); 
+L_B=L(:,:,3); 
+
+%get HSV component
+L_H=L_hsv(:,:,1);
+L_S=L_hsv(:,:,2); 
+L_V=L_hsv(:,:,3);
+
+%create a new martix
+V=ones(width,height/3);
+for i=1:width
+    for j=1:height/3
+        V(i,j)=max(max(L_R(i,j),L_G(i,j)),L_B(i,j));
+    end
+end
+
+%the harr 2d wavelet transform
+template=ones(2,2);
+%approximate and detail coefficient
+A=ones(128,128);
+D1=ones(128,128);
+D2=ones(128,128);
+D3=ones(128,128);
+
+for i=1:2:height/3-1
+    for j=1:2:width-1
+        p=V(i:i+1,j:j+1).*template; %multiply the element in V with template
+        s=sum(sum(p));  %get sum to calculate mean value
+        
+        A((i+1)/2,(j+1)/2)=s/4; %a=（p1+p2+p3+p4）/4    
+        
+        %p1=p(1,1);p2=p(1,2);p3=p(2,1);p4=p(2,2);
+        D1((i+1)/2,(j+1)/2)=(p(1,1)+p(2,1)-p(1,2)-p(2,2))/4; %d1=(p1+p3-p2-p4)/4
+        D2((i+1)/2,(j+1)/2)=(p(1,1)+p(1,2)-p(2,1)-p(2,2))/4; %d2=(p1+p2-p3-p4)/4
+        D3((i+1)/2,(j+1)/2)=(p(1,1)+p(2,2)-p(1,2)-p(2,1))/4; %d3=(p1+p4-p2-p3)/4
+
+    end
+end
+
+[width1,height1]=size(A);
+%Automatic Adaption choosing m and M threshold
+%(1) assign two constant m0 & M0 which satifify min(cA)<=m0<M0<=max(cA) && M0-m0>150
+m0=50;
+M0=210;
+%(2)compute m1 and M1, satisfy about 5% of approx coeffi less than m1 and about 5% larger than M1
+N=0.05*width1*height1;
+n1=0;
+M1=238.5;
+for i=1:width1
+    for j=1:height1
+        if A(i,j)>M1
+            n1=n1+1;
+        end
+    end
+end
+n2=0;
+m1=66;
+for i=1:width1
+    for j=1:height1
+        if A(i,j)<m1
+            n2=n2+1;
+        end
+    end
+end
+ %(3)set m=min(m0,m1),M=max(M0,M1)
+m=min(m0,m1)
+M=max(M0,M1)
+
+%Apply the Reserve-S-Shape transform to the approximate coefficient
+% (1). set K1 & K2, satify K1<m<M<K2 and compute R for EACH approximate coefficient in range [m,M]
+K1=45
+K2=243
+col=1;
+for i=1:width1
+    for j=1:height1
+        if  A(i,j)>=m & A(i,j)<=M
+            R(1,col)=log((A(i,j)-K1)/(K2-A(i,j))); %R as output, its range should be [0,1]
+            col=col+1;
+        end
+    end
+end
+%(2). normalize R
+R=(R-min(R))/(max(R)-min(R));
+%(3)Convert them to the appropriate range and get the new approximate coefficient A'
+col=1;
+for i=1:width1
+    for j=1:height1
+        if  A(i,j)>=m & A(i,j)<=M
+            A(i,j)=R(1,col)*(M-m)+m;
+            col=col+1;
+        end
+    end
+end
+
+%%6. Reconstruct V by inverse wavelet transform
+V_new=ones(256,256);
+p=ones(2,2);
+
+for i=1:2:height/3-1
+    for j=1:2:width-1
+        
+        p(1,1)=(A((i+1)/2,(j+1)/2)+D1((i+1)/2,(j+1)/2)+D2((i+1)/2,(j+1)/2)+D3((i+1)/2,(j+1)/2));
+        p(1,2)=(A((i+1)/2,(j+1)/2)+D2((i+1)/2,(j+1)/2)-D1((i+1)/2,(j+1)/2)-D3((i+1)/2,(j+1)/2));
+        p(2,1)=(A((i+1)/2,(j+1)/2)+D1((i+1)/2,(j+1)/2)-D2((i+1)/2,(j+1)/2)-D3((i+1)/2,(j+1)/2));
+        p(2,2)=(A((i+1)/2,(j+1)/2)+D3((i+1)/2,(j+1)/2)-D1((i+1)/2,(j+1)/2)-D2((i+1)/2,(j+1)/2));
+        
+        V_new(i:i+1,j:j+1)=p;
+        
+    end
+end
+
+%Performance contrast
+tauon_in=var(V(:)); %variance of luminance value
+tauon_out=var(V_new(:));
+C=(tauon_out-tauon_in)/tauon_in
+
+ave_in=mean(mean(V));  %average of luminance value
+ave_out=mean(mean(V_new));
+l=(ave_out-ave_in)/ave_in
+
+%normalize
+L_V=(V_new/max(V_new(:)));
+
+%HSV to RGB
+L_hsv_new=cat(3,L_H,histeq(L_S),L_V);
+L_new=hsv2rgb(L_hsv_new);
+
+figure(1)
+subplot 221
+imshow(L);
+title('original RGB image');
+subplot 223
+imshow(L_hsv);
+title('original HSV image');
+subplot 224
+imshow(L_hsv_new);
+title('contrast enhanced HSV image');
+subplot 222
+imshow(L_new);
+title('contrast enhanced RGB image');
